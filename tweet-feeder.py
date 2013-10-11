@@ -1,6 +1,8 @@
+import base64
 import os
 from flask import Flask, request, url_for, render_template, g, flash, redirect
 from flask.ext.sqlalchemy import SQLAlchemy
+from flask.ext.mail import Mail, Message
 from flask_oauth import OAuth
 
 
@@ -15,7 +17,15 @@ app.secret_key = 'cheeseburger'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///tweet-feeder.db'
 db = SQLAlchemy(app)
 oauth = OAuth()
-
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 465
+app.config['MAIL_USE_SSL'] = True
+app.config['MAIL_USERNAME'] = 'marcus.darden@cs.olivetcollege.edu'
+mail_password = os.environ.get('MAIL_PASSWORD', 'password')
+mail_password = base64.b64decode(mail_password)
+app.config['MAIL_PASSWORD'] = mail_password.strip()
+app.config['MAIL_DEFAULT_SENDER'] = 'marcus.darden@cs.olivetcollege.edu'
+mailer = Mail(app)
 
 twitter = oauth.remote_app('twitter',
                            base_url='https://api.twitter.com/1.1/',
@@ -35,6 +45,14 @@ def index():
     return render_template('index.html', tweets=None)
 
 
+@app.route('/mail')
+def mail():
+    msg = Message('Test message subject.')
+    msg.add_recipient('marcus.darden@cs.olivetcollege.edu')
+    mailer.send(msg)
+    return 'Message sent!'
+
+
 @app.route('/login')
 def login():
     """Calling into authorize will cause the OpenID auth machinery to kick
@@ -42,6 +60,7 @@ def login():
     redirect back to the callback URL provided.
     """
     url = url_for('authorized', next=request.args.get('next') or request.referrer or None)
+    print url
     return twitter.authorize(callback=url)
 
 
