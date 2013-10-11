@@ -1,6 +1,6 @@
 import base64
 import os
-from flask import Flask, request, url_for, render_template, g, flash, redirect
+from flask import Flask, flash, g, redirect, render_template, request, session, url_for
 from flask.ext.sqlalchemy import SQLAlchemy
 from flask.ext.mail import Mail, Message
 from flask_oauth import OAuth
@@ -36,6 +36,19 @@ twitter = oauth.remote_app('twitter',
                            consumer_secret=CONSUMER_SECRET)
 
 
+class User(db.Model):
+    id = db.Column('user_id', db.Integer, primary_key=True)
+    name = db.Column(db.String(60))
+    oauth_token = db.Column(db.String(100))
+    oauth_secret = db.Column(db.String(100))
+
+    def __init__(self, name):
+        self.name = name
+
+    def __repr__(self):
+        return '<User %s>' % self.name
+
+
 #class Tweet(db.Model):
     #pass
 
@@ -43,6 +56,11 @@ twitter = oauth.remote_app('twitter',
 @app.route('/')
 def index():
     return render_template('index.html', tweets=None)
+
+
+@app.route('/feed')
+def feed():
+    return 'Display feed here...'
 
 
 @app.route('/mail')
@@ -59,6 +77,8 @@ def login():
     in.  When all worked out as expected, the remote application will
     redirect back to the callback URL provided.
     """
+    print 'request.args', request.args
+    print 'request.referrer', request.referrer
     url = url_for('authorized', next=request.args.get('next') or request.referrer or None)
     print url
     return twitter.authorize(callback=url)
@@ -80,28 +100,28 @@ def authorized(resp):
     the application submitted.  Note that Twitter itself does not really
     redirect back unless the user clicks on the application name.
     """
-    next_url = request.args.get('next') or url_for('index')
+    next_url = request.args.get('next') or url_for('feed')
     if resp is None:
         flash(u'You denied the request to sign in.')
         return redirect(next_url)
 
-    #user = User.query.filter_by(name=resp['screen_name']).first()
+    user = User.query.filter_by(name=resp['screen_name']).first()
 
     # user never signed on
-    #if user is None:
-        #user = User(resp['screen_name'])
-        #db_session.add(user)
+    if user is None:
+        user = User(resp['screen_name'])
+        db.session.add(user)
     print resp
     print next_url
 
     # in any case we update the authenciation token in the db
     # In case the user temporarily revoked access we will have
     # new tokens here.
-    #user.oauth_token = resp['oauth_token']
-    #user.oauth_secret = resp['oauth_token_secret']
-    #db_session.commit()
+    user.oauth_token = resp['oauth_token']
+    user.oauth_secret = resp['oauth_token_secret']
+    db.session.commit()
 
-    #session['user_id'] = user.id
+    session['user_id'] = user.id
     flash('You were signed in')
     return redirect(next_url)
 
@@ -120,7 +140,20 @@ def get_twitter_token():
         return user.oauth_token, user.oauth_secret
 
 
+@app.before_request
+def before_request():
+    g.user = None
+    if 'user_id' in session:
+        g.user = User.query.get(session['user_id'])
+
+
+@app.after_request
+def after_request(response):
+    db.session.remove()
+    return response
+
+
 if __name__ == '__main__':
-    #db.create_all()
+    db.create_all()
     app.run(debug=True)
 
