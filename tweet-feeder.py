@@ -55,9 +55,33 @@ class User(db.Model):
     #pass
 
 
+def parse_tweet(tweet):
+    id = tweet['id']
+    text = tweet['text']
+    categories = [hashtag['text'] for hashtag in tweet['entities']['hashtags']]
+    for category in categories:
+        text = text.replace('#' + category, '').strip()
+    return {'id': id, 'text': text, 'categories': categories}
+
+
 @app.route('/')
 def index():
-    return render_template('index.html', tweets=None)
+    tweets = None
+    print 'g.user:', g.user
+    if g.user is not None:
+        resp = twitter.get('statuses/home_timeline.json')
+        if resp.status == 200:
+            tweets = resp.data
+            for tweet in tweets:
+                tweet = parse_tweet(tweet)
+                print '{id}: {text}'.format(**tweet)
+                if tweet['categories']:
+                    print '\ttags: {0}'.format(tweet['categories'])
+                print
+        else:
+            print('Unable to load tweets from Twitter. Maybe out of '
+                  'API calls or Twitter is overloaded.')
+    return render_template('index.html', tweets=tweets)
 
 
 @app.route('/feed')
@@ -84,6 +108,13 @@ def login():
     url = url_for('authorized', next=request.args.get('next') or request.referrer or None)
     print url
     return twitter.authorize(callback=url)
+
+
+@app.route('/logout')
+def logout():
+    session.pop('user_id', None)
+    #flash('You were signed out')
+    return redirect(request.referrer or url_for('index'))
 
 
 @app.route('/authorized')
