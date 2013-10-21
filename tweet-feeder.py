@@ -51,17 +51,54 @@ class User(db.Model):
         return '<User %s>' % self.name
 
 
-#class Tweet(db.Model):
-    #pass
+tags = db.Table('tags',
+                db.Column('tweet_id', db.Integer, db.ForeignKey('tweet.id')),
+                db.Column('tag_id', db.String, db.ForeignKey('tag.id')))
+
+
+class Tag(db.Model):
+    id = db.Column(db.String, primary_key=True)
+    text = db.Column(db.String)
+
+    def __init__(self, text):
+        self.id = text.lower()
+        self.text = '#' + text
+
+    def __repr__(self):
+        return '<Tag ({id}): {text}>'.format(**self.__dict__)
+
+
+class Tweet(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    text = db.Column(db.String(160))
+    tags = db.relationship('Tag', secondary=tags,
+                           backref=db.backref('tweets', lazy='dynamic'))
+
+    def __init__(self, id, text, tags):
+        self.id = id
+        # Need SQL injection protection here
+        self.text = text
+        self.tags = [Tag.query.filter_by(id=tag.lower()).first() or Tag(tag)
+                for tag in tags]
+
+    def __repr__(self):
+        t = self.tags
+        return '<Tweet {id}: {text} {tags}>'.format(**self.__dict__)
 
 
 def parse_tweet(tweet):
     id = tweet['id']
+    tags = [hashtag['text'] for hashtag in tweet['entities']['hashtags']]
     text = tweet['text']
-    categories = [hashtag['text'] for hashtag in tweet['entities']['hashtags']]
-    for category in categories:
-        text = text.replace('#' + category, '').strip()
-    return {'id': id, 'text': text, 'categories': categories}
+    if ':' in text:
+        t, text = text.split(':', 1)
+        t = [tag.replace(' ', '') for tag in t.split(',')]
+        tags.extend(t)
+        text = text.strip()
+    for tag in tags:
+        text = text.replace('#' + tag, '').strip()
+    print {'id': id, 'text': text, 'tags': tags}
+    return {'id': id, 'text': text, 'tags': tags}
 
 
 @app.route('/')
@@ -74,9 +111,13 @@ def index():
             tweets = resp.data
             for tweet in tweets:
                 tweet = parse_tweet(tweet)
+                print tweet
+                db_tweet = Tweet(**tweet)
+                db.session.add(db_tweet)
+                db.session.commit()
                 print '{id}: {text}'.format(**tweet)
-                if tweet['categories']:
-                    print '\ttags: {0}'.format(tweet['categories'])
+                if tweet['tags']:
+                    print '\ttags: {0}'.format(tweet['tags'])
                 print
         else:
             print('Unable to load tweets from Twitter. Maybe out of '
@@ -86,6 +127,10 @@ def index():
 
 @app.route('/feed')
 def feed():
+    tweets = Tweet.query.all()
+    print tweets
+    tags = Tag.query.all()
+    print tags
     return 'Display feed here...'
 
 
