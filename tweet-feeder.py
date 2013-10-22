@@ -127,11 +127,16 @@ def index():
 
 @app.route('/feed')
 def feed():
-    tweets = Tweet.query.all()
-    print tweets
-    tags = Tag.query.all()
-    print tags
-    return 'Display feed here...'
+    #tweets = Tweet.query.all()
+    #print tweets
+    #tags = Tag.query.all()
+    #print tags
+    #for tag in tags:
+        #tweets = tag.tweets.all()
+        #print tag.text, tweets
+    #return 'Display feed here...'
+    tags = Tag.query.order_by(Tag.text).all()
+    return render_template('feed.html', tags=tags)
 
 
 @app.route('/mail')

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block body %}
+  {% if g.user %}
+    <div id=sidebar>
+    {% if tags %}
+    <h3>Topics</h3>
+    <ul>
+    {% for tag in tags %}
+      <li><a href="">{{ tag.text }}</a>
+    {% endfor %}
+      <li><a href="">Notes</a>
+    </ul>
+    {% endif %}
+    </div>
+  {% else %}
+    <p>
+      Sign in to view your public timeline.
+    <p>
+      <a href="{{ url_for('login') }}"><img src="{{
+        url_for('static', filename='sign-in.png') }}" alt="Sign in"></a>
+  {% endif %}
+{% endblock %}
+

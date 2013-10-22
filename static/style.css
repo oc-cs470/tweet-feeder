@@ -3,6 +3,7 @@ body {
     font-size: 16px;
     margin: 30px;
     padding: 0;
+    height: 3000px;
 }
 
 img {
@@ -47,3 +48,13 @@ input[name="openid"] {
 h1, h2 {
     font-weight: normal;
 }
+
+div#sidebar {
+    position: fixed;
+    left: 10px;
+    top: 105px;
+    border: 3px solid green;
+    padding: 3px;
+    float: left;
+}
+
